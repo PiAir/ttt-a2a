@@ -1,0 +1,142 @@
+# Boter-kaas-eieren via A2A — docker agent demo
+#
+#   speler X  = CLUSTER.qwen3.8:latest      (A2A-server op :8080)
+#   speler O  = CLUSTER.ornith-1.5:35b      (A2A-server op :8081)
+#   root      = scheidsrechter (eigen proces; praat met beide spelers via A2A
+#               en voert zetten uit via ttt.py, de engine die de regels bewaakt)
+#
+# De API-key komt uit de omgevingsvariabele NOLAI_API_KEY (zie .env.example).
+
+providers:
+  nolai:
+    provider: openai
+    api_type: openai_chatcompletions
+    base_url: https://chat.nolai.nl/api/v1
+    token_key: NOLAI_API_KEY
+
+models:
+  qwen:
+    provider: nolai
+    model: CLUSTER.qwen3.8:latest
+    temperature: 0.7
+  ornith:
+    provider: nolai
+    model: CLUSTER.ornith-1.5:35b
+    temperature: 0.7
+  referee_model:
+    provider: nolai
+    model: CLUSTER.qwen3.8:latest
+    temperature: 0.1
+
+agents:
+  # ------------------------------------------------------------ scheidsrechter
+  root:
+    model: referee_model
+    description: Scheidsrechter die een boter-kaas-eieren-wedstrijd tussen twee A2A-agents leidt
+    max_iterations: 200
+    welcome_message: "Scheidsrechter klaar. Typ bv. 'Speel 3 potjes' (scorebord: http://localhost:9000)."
+    instruction: |
+      Je bent de scheidsrechter van een boter-kaas-eieren-wedstrijd tussen twee
+      AI-spelers. Elke speler is een aparte agent die je ALLEEN via A2A bereikt:
+        - speler X: tool ask_player_x
+        - speler O: tool ask_player_o
+      Je speelt zelf NOOIT mee en verzint NOOIT zelf een zet.
+
+      Werkwijze per potje:
+      1. Roep ttt_new aan. De output zegt wie begint.
+      2. Herhaal tot de engine "RESULT: WIN" of "RESULT: DRAW" meldt:
+         a. P = de speler die aan zet is (staat in de laatste engine-output).
+         b. Roep ttt_view aan met player=P en neem de volledige output over.
+         c. Stuur speler P via ask_player_x of ask_player_o precies dit bericht:
+              Je speelt <P>.
+              <volledige output van ttt_view>
+              Antwoord met twee regels:
+              MOVE: <cel>
+              SAY: <korte plagerige zin>
+         d. Haal uit het antwoord de cel na "MOVE:" (bv. B2) en de tekst na "SAY:".
+         e. Roep ttt_move aan met player=P, cell=<cel> en trash_talk=<SAY-tekst>.
+         f. Begint de output met "ILLEGAL", stuur die foutmelding dan naar
+            dezelfde speler en vraag om een nieuwe zet (terug naar stap d).
+            De engine grijpt zelf in na 3 ongeldige pogingen.
+      3. Meld de uitslag in één zin, met de reeksstand uit de engine-output.
+
+      Commentaar: na elke zet hooguit één korte regel, bv. "X → B2: 'Midden!'".
+      Vraagt de gebruiker om meerdere potjes, speel ze direct na elkaar
+      (ttt_new wisselt automatisch wie begint) en geef aan het eind de eindstand.
+    toolsets:
+      - type: script
+        shell:
+          ttt_new:
+            cmd: python3 ./ttt.py new
+            description: Start een nieuw potje boter-kaas-eieren. Meldt wie begint.
+          ttt_view:
+            cmd: python3 ./ttt.py view "$player"
+            description: Toon het bord en de legale zetten vanuit het perspectief van een speler.
+            args:
+              player:
+                type: string
+                enum: [X, O]
+                description: X of O
+            required: [player]
+          ttt_move:
+            cmd: python3 ./ttt.py move "$player" "$cell" "$trash_talk"
+            description: Voer een zet uit. Geeft OK, ILLEGAL of RESULT (WIN/DRAW) terug.
+            args:
+              player:
+                type: string
+                enum: [X, O]
+                description: X of O
+              cell:
+                type: string
+                description: Cel als rij+kolom, bv. A1, B2 of C3
+              trash_talk:
+                type: string
+                description: De SAY-zin van de speler (verschijnt op het scorebord)
+            required: [player, cell]
+          ttt_status:
+            cmd: python3 ./ttt.py status
+            description: Toon het bord, wie aan zet is en de reeksstand.
+          # A2A-aanroepen naar de spelers (elk een eigen `docker agent serve a2a`-proces)
+          ask_player_x:
+            cmd: python3 ./a2a_send.py http://127.0.0.1:8080 "$message"
+            description: Stuur een bericht naar speler X via A2A en krijg zijn antwoord terug.
+            args:
+              message:
+                type: string
+                description: Het volledige bericht voor speler X
+            required: [message]
+          ask_player_o:
+            cmd: python3 ./a2a_send.py http://127.0.0.1:8081 "$message"
+            description: Stuur een bericht naar speler O via A2A en krijg zijn antwoord terug.
+            args:
+              message:
+                type: string
+                description: Het volledige bericht voor speler O
+            required: [message]
+
+      # De variant met de ingebouwde A2A-tool (type: a2a, zoals in de video)
+      # staat in ttt_v2.yaml. Die werkt (nog) niet in docker agent v1.144-v1.150.
+
+  # ------------------------------------------------------------ spelers
+  player_x:
+    model: qwen
+    description: Boter-kaas-eieren-speler (X). Krijgt een bord en antwoordt met een zet.
+    instruction: &player |
+      Je bent een fanatieke boter-kaas-eieren-speler in een wedstrijd tegen een
+      andere AI. Je krijgt het bord (rijen A-C, kolommen 1-3; "." is leeg) en de
+      lijst "Legale zetten".
+
+      Strategie, in deze volgorde:
+      1. Kun je nu drie op een rij maken? Doe dat.
+      2. Kan de tegenstander volgende beurt drie op een rij maken? Blokkeer.
+      3. Anders: neem het midden (B2), dan een hoek, dan een rand.
+
+      Kies ALTIJD een cel uit "Legale zetten". Antwoord met precies twee
+      regels en verder niets:
+      MOVE: <cel>
+      SAY: <één korte, plagerige maar sportieve zin in het Nederlands>
+
+  player_o:
+    model: ornith
+    description: Boter-kaas-eieren-speler (O). Krijgt een bord en antwoordt met een zet.
+    instruction: *player
