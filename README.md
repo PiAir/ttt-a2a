@@ -1,78 +1,86 @@
-# Boter-kaas-eieren via A2A — docker agent demo
+**English** | [Nederlands](README.nl.md)
 
-Een model op de NOLAI-server speelt tegen een lokaal model in LM Studio. Elk
-model draait als **eigen agent in een eigen proces** en is alleen via **A2A**
-bereikbaar. Een derde agent (de scheidsrechter) leidt de wedstrijd, op een
-derde model dat zelf niet meespeelt. Het opzet is hetzelfde als de
-Battleship-demo uit de
-[Better Stack-video](https://www.youtube.com/watch?v=Mph1H5u3yeA).
+# Tic-tac-toe over A2A — docker agent demo
 
-![Vijf potjes gemma-4-e4b (lokaal) tegen qwen3.8 (NOLAI), met ornith als scheidsrechter](screenshots/ttt-gemma-versus-qwen.png)
+A model on the NOLAI server plays against a local model in LM Studio. Each
+model runs as **its own agent in its own process** and is reachable only over
+**A2A**. A third agent (the referee) runs the match, on a third model that
+does not play. The setup is the same as the Battleship demo in the
+[Better Stack video](https://www.youtube.com/watch?v=Mph1H5u3yeA).
 
-In deze reeks van vijf won qwen3.8 drie keer, gemma-4-e4b één keer en eindigde
-één potje gelijk. Bij foutloos spel eindigt boter-kaas-eieren altijd in
-gelijkspel, dus elke winstpartij is een fout van de verliezer.
+> **Language note.** The demo itself is in Dutch: the agent instructions in
+> the YAML, the scoreboard, the trash talk and the messages printed by the
+> scripts. "Boter-kaas-eieren" is tic-tac-toe, a "potje" is a game, and the
+> "scheidsrechter" is the referee. The prompt `Speel 3 potjes` means "Play 3
+> games". Error messages are quoted literally below so you can search for
+> them.
+
+![Five games of gemma-4-e4b (local) against qwen3.8 (NOLAI), with ornith as referee](screenshots/ttt-gemma-versus-qwen.png)
+
+In this series of five, qwen3.8 won three games, gemma-4-e4b won one and one
+game was a draw. With perfect play tic-tac-toe always ends in a draw, so every
+win is a mistake by the loser.
 
 ```
                       ┌──────────────────────────────┐
-                      │ root = scheidsrechter        │  docker agent run
+                      │ root = referee               │  docker agent run
                       │ CLUSTER.ornith-1.5 (temp 0.1)│
                       └──┬──────────┬────────────┬───┘
             A2A (JSON-RPC)          │            │ A2A (JSON-RPC)
    ┌─────────────────────▼┐   ttt_* tools   ┌───▼──────────────────┐
    │ player_x  :8080      │        │        │ player_o  :8081      │
-   │ CLUSTER.qwen3.8      │        ▼        │ gemma-4-e4b (lokaal) │
+   │ CLUSTER.qwen3.8      │        ▼        │ gemma-4-e4b (local)  │
    │ docker agent serve   │  ttt.py engine  │ docker agent serve   │
    └──────────────────────┘  (state.json)   └──────────────────────┘
                                    │
-                         scorebord :9000 (browser)
+                         scoreboard :9000 (browser)
 ```
 
-* **De spelers** krijgen het bord en de legale zetten. Ze antwoorden met
-  `MOVE: B2` plus `SAY: <trash talk>`. Ze hebben geen tools en zijn stateless.
-* **De scheidsrechter** bedient de engine (`ttt.py`) via script-tools en
-  stuurt de spelers berichten via A2A.
-* **De engine** bewaakt de regels. Een model kan dus niet valsspelen. Na 3
-  ongeldige zetten op rij speelt de engine een willekeurige zet voor die
-  speler. De beginspeler wisselt per potje.
+* **The players** receive the board and the legal moves. They answer with
+  `MOVE: B2` plus `SAY: <trash talk>`. They have no tools and are stateless.
+* **The referee** operates the engine (`ttt.py`) through script tools and
+  sends messages to the players over A2A.
+* **The engine** enforces the rules, so a model cannot cheat. After 3 invalid
+  moves in a row the engine plays a random move for that player. The starting
+  player alternates each game.
 
-## Bestanden
+## Files
 
-| Bestand | Wat |
+| File | What |
 |---|---|
-| `ttt.yaml` | De drie agents, de NOLAI-provider en de tools (werkt met elke geteste versie) |
-| `ttt_v2.yaml` | Zelfde, maar met de ingebouwde `type: a2a`-tool (werkt met docker agent v1.128.0, niet met v1.144/v1.150) |
-| `ttt.py` | Spel-engine en live scorebord (alleen Python-standaardbibliotheek) |
-| `a2a_send.py` | Kleine A2A-client die de scheidsrechter gebruikt (zie *Waarom geen `type: a2a`?*) |
-| `start.sh` | Start alles in één keer en ruimt na afloop op |
-| `check_nolai.py` | Rooktest: bereikt NOLAI de modellen en werkt tool calling? |
-| `lm_relay.py` | Doorgeefluik naar de LM Studio-server (zie *Lokaal model via LM Studio*) |
-| `.env.example` | Sjabloon voor je API-key en het LM Studio-adres |
-| `screenshots/` | Schermafbeeldingen van de verschillende opzetten |
+| `ttt.yaml` | The three agents, the NOLAI provider and the tools (works with every tested version) |
+| `ttt_v2.yaml` | The same, but with the built-in `type: a2a` tool (works with docker agent v1.128.0, not with v1.144/v1.150) |
+| `ttt.py` | Game engine and live scoreboard (Python standard library only) |
+| `a2a_send.py` | Small A2A client used by the referee (see *Why not `type: a2a`?*) |
+| `start.sh` | Starts everything in one go and cleans up afterwards |
+| `check_nolai.py` | Smoke test: can NOLAI reach the models and does tool calling work? |
+| `lm_relay.py` | Relay to the LM Studio server (see *Local model via LM Studio*) |
+| `.env.example` | Template for your API key and the LM Studio address |
+| `screenshots/` | Screenshots of the different setups |
 
-## Draaien (WSL2)
+## Running it (WSL2)
 
-Draai de demo in **WSL2, niet in PowerShell**. De script-tools gebruiken
-bash-syntax (`"$player"`). Onder Windows voert docker agent ze uit in
-PowerShell, en daar werkt die syntax niet.
+Run the demo in **WSL2, not in PowerShell**. The script tools use bash syntax
+(`"$player"`). On Windows, docker agent runs them in PowerShell, where that
+syntax does not work.
 
 ```bash
 cd ttt-a2a
-cp .env.example .env              # vul NOLAI_API_KEY in; zie ook LM Studio hieronder
+cp .env.example .env              # fill in NOLAI_API_KEY; see also LM Studio below
 chmod +x start.sh
 
-docker agent version              # werkt de Docker Desktop-plugin in WSL?
-python3 check_nolai.py            # 1x: beide modellen + tool calling testen
+docker agent version              # does the Docker Desktop plugin work in WSL?
+python3 check_nolai.py            # once: test both models + tool calling
 
-./start.sh                        # TUI; typ: Speel 3 potjes
-# of
+./start.sh                        # TUI; type: Speel 3 potjes
+# or
 ./start.sh --exec "Speel 3 potjes"
 ```
 
-Open het scorebord in je Windows-browser: <http://localhost:9000>. WSL2 stuurt
-localhost automatisch door.
+Open the scoreboard in your Windows browser: <http://localhost:9000>. WSL2
+forwards localhost automatically.
 
-Wil je liever drie terminals, zoals in de video? Dat kan ook:
+Prefer three terminals, as in the video? That works too:
 
 ```bash
 python3 ttt.py serve                                                                   # terminal 1
@@ -81,22 +89,22 @@ docker agent serve a2a ttt.yaml -a player_o --listen 127.0.0.1:8081 --env-from-f
 docker agent run ttt.yaml --yolo --env-from-file .env "Speel 3 potjes"                 # terminal 4
 ```
 
-**Krijg je `docker: 'agent' is not a docker command` in WSL?** Zet dan in
-Docker Desktop *Settings → Resources → WSL integration* aan voor je distro.
-Je kunt ook een losse binary gebruiken; zie *Welke docker agent-versie?*.
+**Getting `docker: 'agent' is not a docker command` in WSL?** Enable
+*Settings → Resources → WSL integration* for your distro in Docker Desktop.
+You can also use a standalone binary; see *Which docker agent version?*.
 
-## Welke docker agent-versie?
+## Which docker agent version?
 
-| Versie | `ttt.yaml` | `ttt_v2.yaml` |
+| Version | `ttt.yaml` | `ttt_v2.yaml` |
 |---|---|---|
-| Docker Desktop-plugin v1.144.0 | werkt | werkt niet (`no compatible transports found`) |
-| v1.150 | niet getest in de huidige opzet | werkt niet (zelfde fout) |
-| Losse binary [v1.128.0](https://github.com/docker/docker-agent/releases/tag/v1.128.0) | werkt | werkt |
+| Docker Desktop plugin v1.144.0 | works | does not work (`no compatible transports found`) |
+| v1.150 | not tested in the current setup | does not work (same error) |
+| Standalone binary [v1.128.0](https://github.com/docker/docker-agent/releases/tag/v1.128.0) | works | works |
 
-v1.128.0 is dus de enige geteste versie waarmee beide varianten draaien. Zo
-haal je hem op (Linux/WSL2, x86-64; de
-[releasepagina](https://github.com/docker/docker-agent/releases/tag/v1.128.0)
-heeft ook builds voor arm64, macOS en Windows):
+So v1.128.0 is the only tested version that runs both variants. This is how
+you get it (Linux/WSL2, x86-64; the
+[release page](https://github.com/docker/docker-agent/releases/tag/v1.128.0)
+also has builds for arm64, macOS and Windows):
 
 ```bash
 curl -L -o docker-agent https://github.com/docker/docker-agent/releases/download/v1.128.0/docker-agent-linux-amd64
@@ -104,178 +112,178 @@ chmod +x docker-agent
 DOCKER_AGENT="./docker-agent --data-dir $HOME/.cagent-v128" ./start.sh
 ```
 
-De eigen `--data-dir` is nodig als je ook de nieuwere plugin gebruikt: die
-werkt de gedeelde sessiedatabase bij naar een formaat dat v1.128.0 weigert
+The separate `--data-dir` is needed if you also use the newer plugin: it
+upgrades the shared session database to a format that v1.128.0 refuses
 (`session database was created by a newer version`).
 
-![Drie potjes met ttt.yaml en plugin v1.144.0 (eerdere opzet met twee NOLAI-spelers)](screenshots/ttt-2.png)
+![Three games with ttt.yaml and plugin v1.144.0 (earlier setup with two NOLAI players)](screenshots/ttt-2.png)
 
-## Lokaal model via LM Studio
+## Local model via LM Studio
 
-Speler O draait op een lokaal model (`google/gemma-4-e4b`) in LM Studio. Zet het
-adres van je LM Studio-server als `LMSTUDIO_HOST=<ip>:1234` in `.env` en
-start in LM Studio de server (*Developer → Start server*, met *Serve on
+Player O runs on a local model (`google/gemma-4-e4b`) in LM Studio. Put the
+address of your LM Studio server in `.env` as `LMSTUDIO_HOST=<ip>:1234` and
+start the server in LM Studio (*Developer → Start server*, with *Serve on
 local network*).
 
-`start.sh` start daarvoor `lm_relay.py`, een doorgeefluik op `127.0.0.1:1235`
-waar de YAML naar wijst. Dat is nodig omdat de Docker Desktop-plugin elk
-niet-lokaal adres door de HTTP-proxy van Docker Desktop stuurt, en die
-weigert het tweede verzoek met `HTTP 400: Bad Request`. Gebruik je de losse
-terminals in plaats van `start.sh`, start het doorgeefluik dan zelf:
+For this, `start.sh` starts `lm_relay.py`, a relay on `127.0.0.1:1235` that
+the YAML points to. It is needed because the Docker Desktop plugin sends every
+non-local address through Docker Desktop's HTTP proxy, which rejects the
+second request with `HTTP 400: Bad Request`. If you use the separate terminals
+instead of `start.sh`, start the relay yourself:
 `python3 lm_relay.py <ip>:1234`.
 
-Instellingen in LM Studio bij het laden van het model (getest op een
-videokaart met 8 GB):
+Settings in LM Studio when loading the model (tested on a graphics card with
+8 GB):
 
-* **Context Length 8192.** Een speler krijgt per beurt alleen het bord en
-  onthoudt niets, dus meer is niet nodig. Met de standaardwaarde van 262144
-  tokens past het model niet meer in het videogeheugen en wordt het
-  onbruikbaar traag.
-* **Max Concurrent 1.** Verzoeken wachten dan op elkaar. Met meerdere
-  tegelijk zakte de snelheid van ongeveer 15 naar 1 à 2 tokens per seconde.
+* **Context Length 8192.** A player only gets the board each turn and
+  remembers nothing, so more is not needed. With the default of 262144 tokens
+  the model no longer fits in video memory and becomes unusably slow.
+* **Max Concurrent 1.** Requests then wait for each other. With several at
+  once, speed dropped from about 15 to 1–2 tokens per second.
 
-**Welk lokaal model als speler?** Getest op vier stellingen met één duidelijk
-beste zet (drie keer blokkeren, één keer winnen), op een RTX 2060 SUPER (8 GB):
+**Which local model as a player?** Tested on four positions with one clearly
+best move (three blocks, one win), on an RTX 2060 SUPER (8 GB):
 
-| Model | Denken uit | Denken aan |
+| Model | Thinking off | Thinking on |
 |---|---|---|
-| `google/gemma-4-e4b` (Q4_K_M) | 1 van 4 goed, 1 à 2 s per zet | 4 van 4 goed, 17 tot 42 s per zet |
-| `qwen3.6-35b-a3b` (Q5_K_M) | 0 van 4 goed, deels onleesbaar | na 5000 tokens (5 minuten) nog geen zet |
-| `qwen3.5-9b` (Q3_K_S) | geldige maar zwakke zetten, 1 à 2 s | na 2500 tokens nog geen zet |
+| `google/gemma-4-e4b` (Q4_K_M) | 1 of 4 correct, 1–2 s per move | 4 of 4 correct, 17 to 42 s per move |
+| `qwen3.6-35b-a3b` (Q5_K_M) | 0 of 4 correct, partly unreadable | no move yet after 5000 tokens (5 minutes) |
+| `qwen3.5-9b` (Q3_K_S) | valid but weak moves, 1–2 s | no move yet after 2500 tokens |
 
-Daarom staat `gemma-4-e4b` in de YAML, met denken aan. Voor een model dat te
-lang nadenkt kan het doorgeefluik het denken uitzetten: zet
-`LMSTUDIO_REASONING=none` in `.env`. Het voegt dan `reasoning_effort: none`
-toe aan elk verzoek. In de YAML instellen kan alleen in nieuwere versies
-(`provider_opts.extra_body.reasoning_effort`); v1.128.0 negeert dat.
+That is why the YAML uses `gemma-4-e4b`, with thinking on. For a model that
+thinks too long, the relay can switch thinking off: set
+`LMSTUDIO_REASONING=none` in `.env`. It then adds `reasoning_effort: none` to
+every request. Setting this in the YAML only works in newer versions
+(`provider_opts.extra_body.reasoning_effort`); v1.128.0 ignores it.
 
-Geen lokaal model? Zet in `ttt.yaml` bij `player_o` weer `model: ornith` en
-laat `LMSTUDIO_HOST` leeg.
+No local model? Set `model: ornith` again for `player_o` in `ttt.yaml` and
+leave `LMSTUDIO_HOST` empty.
 
-**Lokaal model als scheidsrechter?** Dat lukte niet met de geteste modellen op
-een videokaart met 8 GB:
+**Local model as referee?** That did not work with the tested models on a
+graphics card with 8 GB:
 
-| Model | Resultaat als scheidsrechter |
+| Model | Result as referee |
 |---|---|
-| `gemma-4-12b-it` (Q4_0) | Tool calls correct, maar past niet in 8 GB: minder dan 1 token per seconde |
-| `qwen3.5-9b`, uncensored finetune (Q4_K_M) | Schrijft tool calls geregeld als gewone tekst uit, waarna de run stopt |
-| `qwen3.5-9b` (Q3_K_S) | Twaalf tot vijftien tool calls goed, verzint daarna een uitslag en stopt |
+| `gemma-4-12b-it` (Q4_0) | Tool calls correct, but does not fit in 8 GB: less than 1 token per second |
+| `qwen3.5-9b`, uncensored finetune (Q4_K_M) | Regularly writes tool calls out as plain text, after which the run stops |
+| `qwen3.5-9b` (Q3_K_S) | Twelve to fifteen tool calls correct, then invents a result and stops |
 
-## Waarom geen `type: a2a`?
+## Why not `type: a2a`?
 
-De video gebruikt de ingebouwde A2A-tool:
-`toolsets: [{type: a2a, url: http://127.0.0.1:8080}]`. In de huidige
-docker agent (getest met v1.150, de build van 9 okt 2026) werkt dat niet
-tegen een agent die met `docker agent serve a2a` draait:
+The video uses the built-in A2A tool:
+`toolsets: [{type: a2a, url: http://127.0.0.1:8080}]`. In the current
+docker agent (tested with v1.150, the build of 9 Oct 2026) that does not work
+against an agent running with `docker agent serve a2a`:
 
-* de **server** spreekt A2A v1.0 (methode `SendMessage`);
-* de ingebouwde **client** spreekt nog A2A v0.3 (`message/send`) en stopt met
-  `failed to create A2A client: no compatible transports found`.
+* the **server** speaks A2A v1.0 (method `SendMessage`);
+* the built-in **client** still speaks A2A v0.3 (`message/send`) and stops
+  with `failed to create A2A client: no compatible transports found`.
 
-`a2a_send.py` spreekt v1.0 en valt terug op v0.3. Daardoor werkt de demo
-met oudere én nieuwere versies.
+`a2a_send.py` speaks v1.0 and falls back to v0.3. That makes the demo work
+with both older and newer versions.
 
-`ttt_v2.yaml` is dezelfde demo met de ingebouwde `type: a2a`-tool. Getest:
-die faalt in v1.144 én v1.150, maar werkt met de oudere v1.128.0. Haal die
-binary op zoals beschreven onder *Welke docker agent-versie?* en start met:
+`ttt_v2.yaml` is the same demo with the built-in `type: a2a` tool. Tested: it
+fails in both v1.144 and v1.150, but works with the older v1.128.0. Get that
+binary as described under *Which docker agent version?* and start with:
 
 ```bash
 DOCKER_AGENT="./docker-agent --data-dir $HOME/.cagent-v128" CONFIG=ttt_v2.yaml ./start.sh "Speel 1 potje"
 ```
 
-De screenshot bovenaan is met deze variant gemaakt.
+The screenshot at the top was made with this variant.
 
-De ingebouwde A2A-tool wacht standaard maar 30 seconden op een antwoord. Een
-denkend model doet daar vaak langer over; de scheidsrechter krijgt dan
-`A2A call failed: ... context deadline exceeded`, probeert het opnieuw en het
-spel loopt vast. Daarom staat in `ttt_v2.yaml` bij beide A2A-toolsets
-`timeout: 300`.
+By default the built-in A2A tool waits only 30 seconds for an answer. A
+thinking model often takes longer; the referee then gets
+`A2A call failed: ... context deadline exceeded`, retries, and the game gets
+stuck. That is why both A2A toolsets in `ttt_v2.yaml` have `timeout: 300`.
 
-Zie je meteen `no compatible transports found`, dan gebruik je een versie
-waarin client en server niet bij elkaar passen. Gebruik dan `ttt.yaml`.
+If you immediately see `no compatible transports found`, you are using a
+version in which client and server do not match. Use `ttt.yaml` instead.
 
-## Wat er onderweg misging
+## What went wrong along the way
 
-De demo werkte niet in één keer. Dit zijn de problemen die we tegenkwamen, in
-de volgorde waarin ze opdoken, met de oorzaak en wat eraan gedaan is.
+The demo did not work on the first try. These are the problems we ran into, in
+the order they appeared, with the cause and what was done about it.
 
-| Wat we zagen | Oorzaak | Oplossing |
+| What we saw | Cause | Solution |
 |---|---|---|
-| `no compatible transports found` met de ingebouwde A2A-tool | In v1.144 en v1.150 spreekt de server A2A v1.0 en de ingebouwde client nog v0.3 | `ttt.yaml` met de eigen client `a2a_send.py`, of v1.128.0 voor `ttt_v2.yaml` |
-| v1.128.0 start niet: `session database was created by a newer version` | De plugin en de losse binary delen één sessiedatabase | Eigen map meegeven: `--data-dir $HOME/.cagent-v128` |
-| Lokaal model haalt 0,3 tokens per seconde | LM Studio laadde het model met 262144 tokens context; dat vult het videogeheugen | Laden met context 8192 |
-| Een model van 12B blijft traag, ook met kleine context | Het model zelf (7 GB) past niet naast de context in 8 GB videogeheugen | Een kleiner model kiezen |
-| `HTTP 400: Bad Request` na de eerste tool call, terwijl LM Studio het eerste verzoek gewoon afhandelt | De Docker Desktop-plugin stuurt elk niet-lokaal adres door de HTTP-proxy van Docker Desktop (`http-proxy.sock`); die weigert het tweede verzoek op dezelfde verbinding. `NO_PROXY` helpt niet | `lm_relay.py`: de YAML wijst naar `127.0.0.1` en het doorgeefluik stuurt door |
-| Scheidsrechter schrijft `<tool_call>…` als gewone tekst en stopt | Een finetune van qwen3.5-9b gebruikt een tool-call-formaat dat LM Studio niet altijd herkent | Ander model |
-| Scheidsrechter verzint na vier of vijf zetten een uitslag | Een klein lokaal model houdt de lange tool-loop niet vol; meer context hielp niet | Scheidsrechter op een groter model (NOLAI) |
-| Lokale speler geeft geen zet; de A2A-aanroep loopt in een time-out | Het model blijft nadenken: 2500 tot 5000 tokens zonder antwoord | Denken uitzetten (`LMSTUDIO_REASONING=none`) of een model kiezen dat sneller klaar is met nadenken |
-| Na één time-out staan er twee, drie verzoeken tegelijk in LM Studio en wordt alles nog trager | De scheidsrechter probeert het opnieuw terwijl het eerste verzoek nog loopt; parallelle verzoeken delen de GPU | *Max Concurrent 1* in LM Studio, en vooral de oorzaak van de time-out wegnemen |
-| Met denken uit verliest de lokale speler bijna alles, of speelt ongeldige zetten | Zonder nadenken overzien deze modellen het bord niet | Model kiezen dat mét denken snel genoeg is (gemma-4-e4b: 17 tot 42 s) |
-| Denken uitzetten in de YAML werkt met de plugin maar niet met v1.128.0 | v1.128.0 negeert `provider_opts.extra_body` | Het doorgeefluik voegt `reasoning_effort` toe, los van de versie |
-| `ttt_v2.yaml`: eerste zet van een speler lukt, daarna herhaald `context deadline exceeded` | De ingebouwde A2A-tool wacht standaard 30 seconden; de speler deed 25 tot 49 seconden over een zet | `timeout: 300` bij de A2A-toolsets |
-| `start.sh` geeft vreemde fouten of start niet in WSL | Het script was op Windows bewerkt terwijl het draaide, of had CRLF-regeleinden gekregen | Niet bewerken tijdens een run; `.gitattributes` dwingt LF af |
+| `no compatible transports found` with the built-in A2A tool | In v1.144 and v1.150 the server speaks A2A v1.0 and the built-in client still v0.3 | `ttt.yaml` with its own client `a2a_send.py`, or v1.128.0 for `ttt_v2.yaml` |
+| v1.128.0 does not start: `session database was created by a newer version` | The plugin and the standalone binary share one session database | Give it its own directory: `--data-dir $HOME/.cagent-v128` |
+| Local model reaches 0.3 tokens per second | LM Studio loaded the model with 262144 tokens of context; that fills the video memory | Load with context 8192 |
+| A 12B model stays slow, even with a small context | The model itself (7 GB) does not fit next to the context in 8 GB of video memory | Choose a smaller model |
+| `HTTP 400: Bad Request` after the first tool call, while LM Studio handles the first request fine | The Docker Desktop plugin sends every non-local address through Docker Desktop's HTTP proxy (`http-proxy.sock`); it rejects the second request on the same connection. `NO_PROXY` does not help | `lm_relay.py`: the YAML points to `127.0.0.1` and the relay forwards |
+| Referee writes `<tool_call>…` as plain text and stops | A finetune of qwen3.5-9b uses a tool-call format that LM Studio does not always recognise | Different model |
+| Referee invents a result after four or five moves | A small local model cannot sustain the long tool loop; more context did not help | Referee on a larger model (NOLAI) |
+| Local player gives no move; the A2A call times out | The model keeps thinking: 2500 to 5000 tokens without an answer | Switch thinking off (`LMSTUDIO_REASONING=none`) or choose a model that finishes thinking sooner |
+| After one time-out there are two or three requests at once in LM Studio and everything gets even slower | The referee retries while the first request is still running; parallel requests share the GPU | *Max Concurrent 1* in LM Studio, and above all remove the cause of the time-out |
+| With thinking off the local player loses almost everything, or plays invalid moves | Without thinking these models do not read the board properly | Choose a model that is fast enough with thinking on (gemma-4-e4b: 17 to 42 s) |
+| Switching thinking off in the YAML works with the plugin but not with v1.128.0 | v1.128.0 ignores `provider_opts.extra_body` | The relay adds `reasoning_effort`, regardless of the version |
+| `ttt_v2.yaml`: a player's first move succeeds, then repeated `context deadline exceeded` | The built-in A2A tool waits 30 seconds by default; the player took 25 to 49 seconds per move | `timeout: 300` on the A2A toolsets |
+| `start.sh` gives strange errors or does not start in WSL | The script was edited on Windows while it was running, or had picked up CRLF line endings | Do not edit during a run; `.gitattributes` enforces LF |
 
-Twee dingen die hielpen bij het zoeken: de debugoptie van docker agent
-(`--debug --log-file <bestand>`) en de sessiedatabase in de `--data-dir`, waar
-de foutmeldingen van mislukte tool calls letterlijk in staan.
+Two things that helped while searching: docker agent's debug option
+(`--debug --log-file <file>`) and the session database in the `--data-dir`,
+which contains the literal error messages of failed tool calls.
 
-## Een andere configuratie dan deze
+## A different configuration from this one
 
-Deze demo is gebouwd en getest op één opstelling: Windows 11 met WSL2 en
-Docker Desktop, LM Studio op dezelfde pc (RTX 2060 SUPER, 8 GB) en de
-NOLAI-server voor de grotere modellen. Wat hieronder staat over andere
-opstellingen is **niet getest**, tenzij het erbij staat.
+This demo was built and tested on one setup: Windows 11 with WSL2 and Docker
+Desktop, LM Studio on the same PC (RTX 2060 SUPER, 8 GB) and the NOLAI server
+for the larger models. What follows about other setups is **not tested**,
+unless stated otherwise.
 
-* **Een andere aanbieder dan NOLAI.** Elke OpenAI-compatibele server werkt in
-  principe. Pas in de YAML onder `providers:` de `base_url` en `token_key`
-  aan en onder `models:` de modelnamen, en zet de key in `.env`. In
-  `check_nolai.py` staan het adres en de modelnamen bovenin het bestand.
-* **Alles in de cloud, geen lokaal model.** Zet bij `player_o` een
-  cloudmodel en laat `LMSTUDIO_HOST` leeg; het doorgeefluik start dan niet.
-  Zo is de eerste versie van deze demo getest (zie de screenshot hierboven).
-* **LM Studio op dezelfde pc als WSL2.** Gebruik het netwerkadres van de pc
-  (bv. `192.168.x.x:1234`) en zet in LM Studio *Serve on local network* aan.
-  `127.0.0.1` binnen WSL2 is niet de Windows-kant. Zo draait deze demo.
-* **Ollama, llama.cpp of een andere lokale server.** Het doorgeefluik stuurt
-  elk HTTP-verzoek door, dus `LMSTUDIO_HOST=<ip>:<poort>` zou moeten volstaan,
-  met de juiste modelnaam in de YAML. Of `reasoning_effort: none` daar het
-  denken uitzet verschilt per server.
-* **Linux of macOS zonder Docker Desktop.** Het proxyprobleem komt van Docker
-  Desktop. Met een losse binary is het doorgeefluik waarschijnlijk niet nodig,
-  maar het kan geen kwaad.
-* **Meer videogeheugen.** Dan passen grotere modellen en kun je een lokaal
-  model als scheidsrechter proberen. Reken per zet op vier tool calls voor de
-  scheidsrechter en een hele wedstrijd in één context.
-* **Een ander lokaal model kiezen.** Vuistregels uit deze tests: het model
-  moet volledig in het videogeheugen passen, een speler moet binnen de
-  time-out (300 s) antwoorden, en een denkend model speelt veel beter dan
-  hetzelfde model zonder denken. Test een kandidaat eerst los met één bord en
-  kijk hoeveel tokens het aan nadenken besteedt.
-* **Andere poorten.** 8080 en 8081 (spelers), 9000 (scorebord) en 1235
-  (doorgeefluik) staan in `start.sh` en in de YAML.
+* **A provider other than NOLAI.** Any OpenAI-compatible server should work.
+  In the YAML, change `base_url` and `token_key` under `providers:` and the
+  model names under `models:`, and put the key in `.env`. In `check_nolai.py`
+  the address and the model names are at the top of the file.
+* **Everything in the cloud, no local model.** Give `player_o` a cloud model
+  and leave `LMSTUDIO_HOST` empty; the relay then does not start. The first
+  version of this demo was tested this way (see the screenshot above).
+* **LM Studio on the same PC as WSL2.** Use the PC's network address (e.g.
+  `192.168.x.x:1234`) and enable *Serve on local network* in LM Studio.
+  `127.0.0.1` inside WSL2 is not the Windows side. This is how this demo runs.
+* **Ollama, llama.cpp or another local server.** The relay forwards every
+  HTTP request, so `LMSTUDIO_HOST=<ip>:<port>` should be enough, with the
+  right model name in the YAML. Whether `reasoning_effort: none` switches
+  thinking off there differs per server.
+* **Linux or macOS without Docker Desktop.** The proxy problem comes from
+  Docker Desktop. With a standalone binary the relay is probably not needed,
+  but it does no harm.
+* **More video memory.** Larger models then fit and you can try a local model
+  as referee. Count on four tool calls per move for the referee and a whole
+  match in one context.
+* **Choosing a different local model.** Rules of thumb from these tests: the
+  model must fit entirely in video memory, a player must answer within the
+  time-out (300 s), and a thinking model plays much better than the same model
+  without thinking. Test a candidate separately with one board first and see
+  how many tokens it spends on thinking.
+* **Other ports.** 8080 and 8081 (players), 9000 (scoreboard) and 1235
+  (relay) are set in `start.sh` and in the YAML.
 
-## Aanpassen
+## Customising
 
-* **Ander model of een andere scheidsrechter:** pas `models:` aan in
-  `ttt.yaml`. Houd de scheidsrechter op een model dat niet meespeelt, dan
-  beoordeelt geen speler zijn eigen partij. De namen op het scorebord leest
-  `start.sh` zelf uit de YAML; met `TTT_NAME_X`, `TTT_NAME_O` en `TTT_NAME_REF` kun je
-  ze overschrijven.
-* **Spelers sterker of zwakker maken:** de strategie staat in de instructie
-  van de spelers (YAML-anchor `&player`).
-* **Tool calling werkt niet via NOLAI?** Alleen de scheidsrechter heeft tool
-  calling nodig. Kies daarvoor een model waarbij `check_nolai.py` stap [2] OK
-  geeft.
+* **A different model or a different referee:** change `models:` in
+  `ttt.yaml`. Keep the referee on a model that does not play, so no player
+  judges its own game. `start.sh` reads the names on the scoreboard from the
+  YAML itself; you can override them with `TTT_NAME_X`, `TTT_NAME_O` and
+  `TTT_NAME_REF`.
+* **Making players stronger or weaker:** the strategy is in the players'
+  instruction (YAML anchor `&player`).
+* **An English-language demo:** translate the instructions and the
+  `welcome_message` in the YAML. The players are told to trash-talk in Dutch;
+  that is one line in the same instruction.
+* **Tool calling does not work via NOLAI?** Only the referee needs tool
+  calling. Choose a model for which `check_nolai.py` reports OK at step [2].
 
-## Problemen oplossen
+## Troubleshooting
 
-| Symptoom | Oorzaak / oplossing |
+| Symptom | Cause / solution |
 |---|---|
-| `A2A-FOUT: ... niet bereikbaar` | Speler draait niet; zie `logs/player_x.log` |
-| Scheidsrechter verzint zelf zetten of stopt halverwege | Model te zwak voor de tool-loop: lagere temperature, of een ander model als `referee_model` |
-| Speler O reageert niet of extreem traag | LM Studio-server uit, verkeerd adres in `LMSTUDIO_HOST`, het model is met een te grote contextlengte geladen, of er lopen meerdere verzoeken tegelijk (zie *Lokaal model via LM Studio*) |
-| `HTTP 400: Bad Request` na de eerste tool call | Een agent praat rechtstreeks met een niet-lokaal adres; gebruik `lm_relay.py` (zie *Lokaal model via LM Studio*) |
-| 401/403 van NOLAI | Key niet geladen: staat `.env` in deze map en gebruik je `--env-from-file .env`? |
-| Erg traag | Denkende modellen redeneren lang per zet; de A2A-timeout is 300 s (`A2A_TIMEOUT`) |
-| `A2A call failed: ... context deadline exceeded` (alleen `ttt_v2.yaml`) | Speler doet langer over een zet dan de time-out van de A2A-tool; verhoog `timeout` bij de A2A-toolsets |
-| Poort al in gebruik | Oude processen draaien nog: `pkill -f "serve a2a"` |
+| `A2A-FOUT: ... niet bereikbaar` ("A2A error: not reachable") | Player is not running; see `logs/player_x.log` |
+| Referee makes up moves itself or stops halfway | Model too weak for the tool loop: lower temperature, or a different model as `referee_model` |
+| Player O does not respond or is extremely slow | LM Studio server off, wrong address in `LMSTUDIO_HOST`, the model was loaded with too large a context length, or several requests are running at once (see *Local model via LM Studio*) |
+| `HTTP 400: Bad Request` after the first tool call | An agent is talking directly to a non-local address; use `lm_relay.py` (see *Local model via LM Studio*) |
+| 401/403 from NOLAI | Key not loaded: is `.env` in this directory and are you using `--env-from-file .env`? |
+| Very slow | Thinking models reason for a long time per move; the A2A time-out is 300 s (`A2A_TIMEOUT`) |
+| `A2A call failed: ... context deadline exceeded` (`ttt_v2.yaml` only) | Player takes longer over a move than the A2A tool's time-out; raise `timeout` on the A2A toolsets |
+| Port already in use | Old processes are still running: `pkill -f "serve a2a"` |
