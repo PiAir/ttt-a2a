@@ -107,11 +107,13 @@ videokaart met 8 GB):
 * **Max Concurrent 1.** Verzoeken wachten dan op elkaar. Met meerdere
   tegelijk zakte de snelheid van ongeveer 15 naar 1 à 2 tokens per seconde.
 
-In de YAML staat het **denken uit** voor het lokale model
-(`provider_opts.extra_body.reasoning_effort: none`). Met denken aan deed
-`qwen3.5-9b` minuten over één zet en liep de A2A-aanroep in een time-out;
-zonder denken komt de zet binnen een paar seconden. Het speelt daardoor wel
-zwakker.
+Het doorgeefluik zet ook het **denken uit** voor het lokale model: het voegt
+`reasoning_effort: none` toe aan elk verzoek. Met denken aan deed `qwen3.5-9b`
+minuten over één zet en liep de A2A-aanroep in een time-out; zonder denken
+komt de zet binnen een paar seconden. Het speelt daardoor wel zwakker. Wil je
+het denken aan laten, start dan met `LMSTUDIO_REASONING= ./start.sh`. In de
+YAML instellen kan alleen in nieuwere versies
+(`provider_opts.extra_body.reasoning_effort`); v1.128.0 negeert dat.
 
 Geen lokaal model? Zet in `ttt.yaml` bij `player_o` weer `model: ornith` en
 laat `LMSTUDIO_HOST` leeg.
@@ -147,8 +149,18 @@ in deze map en start met:
 
 ```bash
 chmod +x docker-agent
-DOCKER_AGENT=./docker-agent CONFIG=ttt_v2.yaml ./start.sh "Speel 1 potje"
+DOCKER_AGENT="./docker-agent --data-dir $HOME/.cagent-v128" CONFIG=ttt_v2.yaml ./start.sh "Speel 1 potje"
 ```
+
+De eigen `--data-dir` is nodig als je ook de nieuwere plugin gebruikt: die
+werkt de gedeelde sessiedatabase bij naar een formaat dat v1.128.0 weigert
+(`session database was created by a newer version`).
+
+De ingebouwde A2A-tool wacht standaard maar 30 seconden op een antwoord. Een
+denkend model doet daar vaak langer over; de scheidsrechter krijgt dan
+`A2A call failed: ... context deadline exceeded`, probeert het opnieuw en het
+spel loopt vast. Daarom staat in `ttt_v2.yaml` bij beide A2A-toolsets
+`timeout: 300`.
 
 ![ttt_v2.yaml met de ingebouwde A2A-tool in docker agent v1.128.0](screenshots/ttt-1.png)
 
@@ -178,4 +190,5 @@ waarin client en server niet bij elkaar passen. Gebruik dan `ttt.yaml`.
 | `HTTP 400: Bad Request` na de eerste tool call | Een agent praat rechtstreeks met een niet-lokaal adres; gebruik `lm_relay.py` (zie *Lokaal model via LM Studio*) |
 | 401/403 van NOLAI | Key niet geladen: staat `.env` in deze map en gebruik je `--env-from-file .env`? |
 | Erg traag | Denkende modellen redeneren lang per zet; de A2A-timeout is 300 s (`A2A_TIMEOUT`) |
+| `A2A call failed: ... context deadline exceeded` (alleen `ttt_v2.yaml`) | Speler doet langer over een zet dan de time-out van de A2A-tool; verhoog `timeout` bij de A2A-toolsets |
 | Poort al in gebruik | Oude processen draaien nog: `pkill -f "serve a2a"` |

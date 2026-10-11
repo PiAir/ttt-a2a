@@ -5,7 +5,8 @@
 # Let op: in docker agent v1.144 t/m v1.150 faalt dit tegen `serve a2a` met
 # "no compatible transports found" (client spreekt A2A v0.3, server v1.0).
 # Gebruik dan ttt.yaml. Met de losse binary van v1.128.0 werkt het wel:
-#   DOCKER_AGENT=./docker-agent CONFIG=ttt_v2.yaml ./start.sh   (zie README)
+#   DOCKER_AGENT="./docker-agent --data-dir $HOME/.cagent-v128" CONFIG=ttt_v2.yaml ./start.sh
+# (zie README).
 #
 #   speler X  = CLUSTER.qwen3.8:latest      (A2A-server op :8080)
 #   speler O  = qwen3.5-9b via LM Studio   (A2A-server op :8081)
@@ -45,11 +46,8 @@ models:
     provider: lmstudio
     model: qwen3.5-9b
     temperature: 0.7
-    # Denken uit: met denken aan doet dit model minuten over één zet en
-    # loopt de A2A-aanroep in een time-out.
-    provider_opts:
-      extra_body:
-        reasoning_effort: none
+    # Het doorgeefluik lm_relay.py zet het denken uit (reasoning_effort:
+    # none); met denken aan doet dit model minuten over één zet.
   # De scheidsrechter heeft betrouwbare tool calling over tientallen stappen
   # nodig. Kleine lokale modellen (getest: qwen3.5-9b) verzinnen halverwege
   # een uitslag; daarom draait hij op NOLAI, op het model dat niet meespeelt.
@@ -137,10 +135,12 @@ agents:
         name: player_x
         url: http://127.0.0.1:8080
         allow_private_ips: true
+        timeout: 300  # seconden; standaard 30, te kort voor een denkend model
       - type: a2a
         name: player_o
         url: http://127.0.0.1:8081
         allow_private_ips: true
+        timeout: 300  # seconden; standaard 30, te kort voor een denkend model
 
   # ------------------------------------------------------------ spelers
   player_x:

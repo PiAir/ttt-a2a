@@ -38,11 +38,8 @@ models:
     provider: lmstudio
     model: qwen3.5-9b
     temperature: 0.7
-    # Denken uit: met denken aan doet dit model minuten over één zet en
-    # loopt de A2A-aanroep in een time-out.
-    provider_opts:
-      extra_body:
-        reasoning_effort: none
+    # Het doorgeefluik lm_relay.py zet het denken uit (reasoning_effort:
+    # none); met denken aan doet dit model minuten over één zet.
   # De scheidsrechter heeft betrouwbare tool calling over tientallen stappen
   # nodig. Kleine lokale modellen (getest: qwen3.5-9b) verzinnen halverwege
   # een uitslag; daarom draait hij op NOLAI, op het model dat niet meespeelt.
