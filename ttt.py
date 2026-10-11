@@ -21,10 +21,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, "state.json")
 
-# Namen op het scorebord (alleen weergave; de echte modellen staan in ttt.yaml)
+# Namen op het scorebord (alleen weergave). start.sh leest ze uit de YAML en
+# zet deze variabelen; de waarden hier gelden als je ttt.py los start.
 NAMES = {
     "X": os.environ.get("TTT_NAME_X", "qwen3.8"),
-    "O": os.environ.get("TTT_NAME_O", "ornith-1.5:35b"),
+    "O": os.environ.get("TTT_NAME_O", "qwen3.5-9b"),
+    "R": os.environ.get("TTT_NAME_REF", "qwen3.8"),  # scheidsrechter
 }
 MAX_ILLEGAL = 3  # na zoveel ongeldige pogingen op rij doet de engine een willekeurige zet
 
@@ -222,22 +224,27 @@ justify-content:center;font-size:64px;font-weight:800;position:relative}
 .c.X{color:var(--x)}.c.O{color:var(--o)}.c.win{background:#2a2412;box-shadow:inset 0 0 0 2px var(--win)}
 .c.last{box-shadow:inset 0 0 0 2px #ffffff55}
 #msg{text-align:center;margin:18px 0 6px;font-size:18px;min-height:26px}
-#log{color:var(--dim);font-size:13px;text-align:center}
+#log{color:var(--dim);font-size:13px;text-align:center;min-height:18px}
+.p q:empty::before,.p q:empty::after{content:none}
+.ref{background:var(--panel);border-radius:12px;padding:10px 14px;width:min(360px,100%);margin:20px auto 0;
+text-align:center;color:var(--win)}.ref small{display:block;color:var(--dim);font-size:11px;letter-spacing:.15em;text-transform:uppercase}
 </style></head><body><main>
 <h1>Boter-kaas-eieren &middot; live via A2A &middot; docker agent</h1>
 <div class="vs"><div class="p px" id="px"><b>X</b><span id="nx"></span><br><small id="ix"></small><q id="qx"></q></div>
 <div class="score" id="sc">0 - 0<small></small></div>
 <div class="p po" id="po"><b>O</b><span id="no"></span><br><small id="io"></small><q id="qo"></q></div></div>
 <div class="board" id="bd"></div><div id="msg"></div><div id="log"></div>
+<div class="ref"><small>Scheidsrechter</small><span id="nr"></span></div>
 <script>
 const cells=["A1","A2","A3","B1","B2","B3","C1","C2","C3"];
 async function tick(){
  let s;try{s=await (await fetch('state.json?'+Date.now())).json()}catch(e){return}
  const g=s.game, n=s.names;
- nx.textContent=n.X; no.textContent=n.O;
+ nx.textContent=n.X; no.textContent=n.O; nr.textContent=n.R;
  sc.innerHTML=`${s.score.X} - ${s.score.O}<small>gelijk ${s.score.draw} &middot; potje #${s.game_no}</small>`;
  if(!g){msg.textContent='Wachten op de scheidsrechter...';bd.innerHTML='';return}
- ix.textContent=`ongeldige zetten: ${g.illegal_total.X}`; io.textContent=`ongeldige zetten: ${g.illegal_total.O}`;
+ const bad=k=>g.illegal_total[k]?`ongeldige zetten: ${g.illegal_total[k]}`:'';
+ ix.textContent=bad('X'); io.textContent=bad('O');
  qx.textContent=(g.quote||{}).X||''; qo.textContent=(g.quote||{}).O||'';
  px.classList.toggle('turn',!g.winner&&g.turn==='X'); po.classList.toggle('turn',!g.winner&&g.turn==='O');
  const last=g.moves.length?g.moves[g.moves.length-1].cell:null, win=g.line||[];

@@ -1,7 +1,7 @@
 # Boter-kaas-eieren via A2A — docker agent demo
 #
 #   speler X  = CLUSTER.qwen3.8:latest      (A2A-server op :8080)
-#   speler O  = CLUSTER.ornith-1.5:35b      (A2A-server op :8081)
+#   speler O  = qwen3.5-9b via LM Studio   (A2A-server op :8081)
 #   root      = scheidsrechter (eigen proces; praat met beide spelers via A2A
 #               en voert zetten uit via ttt.py, de engine die de regels bewaakt)
 #
@@ -13,6 +13,15 @@ providers:
     api_type: openai_chatcompletions
     base_url: https://chat.nolai.nl/api/v1
     token_key: NOLAI_API_KEY
+  # Lokaal model via LM Studio (OpenAI-compatibele server). 127.0.0.1:1235 is
+  # het doorgeefluik lm_relay.py, dat start.sh start; het echte adres staat
+  # als LMSTUDIO_HOST in .env. LM Studio controleert de key niet, maar hij
+  # moet wel bestaan (zie .env.example).
+  lmstudio:
+    provider: openai
+    api_type: openai_chatcompletions
+    base_url: http://127.0.0.1:1235/v1
+    token_key: LMSTUDIO_API_KEY
 
 models:
   qwen:
@@ -23,9 +32,23 @@ models:
     provider: nolai
     model: CLUSTER.ornith-1.5:35b
     temperature: 0.7
+  # Lokaal model via LM Studio; speelt als O. Terug naar NOLAI: zet
+  # `model: ornith` bij player_o.
+  local:
+    provider: lmstudio
+    model: qwen3.5-9b
+    temperature: 0.7
+    # Denken uit: met denken aan doet dit model minuten over één zet en
+    # loopt de A2A-aanroep in een time-out.
+    provider_opts:
+      extra_body:
+        reasoning_effort: none
+  # De scheidsrechter heeft betrouwbare tool calling over tientallen stappen
+  # nodig. Kleine lokale modellen (getest: qwen3.5-9b) verzinnen halverwege
+  # een uitslag; daarom draait hij op NOLAI, op het model dat niet meespeelt.
   referee_model:
     provider: nolai
-    model: CLUSTER.qwen3.8:latest
+    model: CLUSTER.ornith-1.5:35b
     temperature: 0.1
 
 agents:
@@ -60,7 +83,9 @@ agents:
             De engine grijpt zelf in na 3 ongeldige pogingen.
       3. Meld de uitslag in één zin, met de reeksstand uit de engine-output.
 
-      Commentaar: na elke zet hooguit één korte regel, bv. "X → B2: 'Midden!'".
+      Roep per antwoord precies één tool aan en schrijf daar GEEN tekst bij:
+      geen uitleg vooraf, geen commentaar achteraf. Alleen de uitslag in stap 3
+      is gewone tekst.
       Vraagt de gebruiker om meerdere potjes, speel ze direct na elkaar
       (ttt_new wisselt automatisch wie begint) en geef aan het eind de eindstand.
     toolsets:
@@ -137,6 +162,6 @@ agents:
       SAY: <één korte, plagerige maar sportieve zin in het Nederlands>
 
   player_o:
-    model: ornith
+    model: local
     description: Boter-kaas-eieren-speler (O). Krijgt een bord en antwoordt met een zet.
     instruction: *player
