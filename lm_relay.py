@@ -10,11 +10,11 @@ Het doet twee dingen:
    Die weigert het tweede verzoek op dezelfde verbinding met "HTTP 400: Bad
    Request". Verkeer naar 127.0.0.1 gaat niet door die proxy, dus de YAML
    wijst naar dit doorgeefluik.
-2. Denken uitzetten. Het voegt `reasoning_effort` toe aan elk chatverzoek
-   (standaard "none", aan te passen met LMSTUDIO_REASONING; leeg = niets
-   toevoegen). Met denken aan doet een klein lokaal model minuten over één
-   zet. Dit staat hier en niet in de YAML, omdat oudere docker agent-versies
-   (v1.128.0) `provider_opts.extra_body` negeren.
+2. Optioneel het denken sturen. Met LMSTUDIO_REASONING=none voegt het
+   `reasoning_effort: none` toe aan elk chatverzoek. Sommige lokale modellen
+   doen met denken aan minuten over één zet. Dit staat hier en niet in de
+   YAML, omdat oudere docker agent-versies (v1.128.0)
+   `provider_opts.extra_body` negeren.
 
 Alleen standaardbibliotheek; geen extra pakketten nodig.
 """
@@ -24,7 +24,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-REASONING = os.environ.get("LMSTUDIO_REASONING", "none")
+REASONING = os.environ.get("LMSTUDIO_REASONING", "")
 TIMEOUT = int(os.environ.get("A2A_TIMEOUT", "300"))
 SKIP = {"host", "content-length", "connection", "transfer-encoding", "keep-alive"}
 TARGET = ("127.0.0.1", 1234)

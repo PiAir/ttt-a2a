@@ -17,7 +17,7 @@ Battleship-demo uit de
             A2A (JSON-RPC)          │            │ A2A (JSON-RPC)
    ┌─────────────────────▼┐   ttt_* tools   ┌───▼──────────────────┐
    │ player_x  :8080      │        │        │ player_o  :8081      │
-   │ CLUSTER.qwen3.8      │        ▼        │ qwen3.5-9b (lokaal)  │
+   │ CLUSTER.qwen3.8      │        ▼        │ gemma-4-e4b (lokaal) │
    │ docker agent serve   │  ttt.py engine  │ docker agent serve   │
    └──────────────────────┘  (state.json)   └──────────────────────┘
                                    │
@@ -85,7 +85,7 @@ Je kunt ook de Linux-binary van
 
 ## Lokaal model via LM Studio
 
-Speler O draait op een lokaal model (`qwen3.5-9b`) in LM Studio. Zet het
+Speler O draait op een lokaal model (`google/gemma-4-e4b`) in LM Studio. Zet het
 adres van je LM Studio-server als `LMSTUDIO_HOST=<ip>:1234` in `.env` en
 start in LM Studio de server (*Developer → Start server*, met *Serve on
 local network*).
@@ -107,12 +107,19 @@ videokaart met 8 GB):
 * **Max Concurrent 1.** Verzoeken wachten dan op elkaar. Met meerdere
   tegelijk zakte de snelheid van ongeveer 15 naar 1 à 2 tokens per seconde.
 
-Het doorgeefluik zet ook het **denken uit** voor het lokale model: het voegt
-`reasoning_effort: none` toe aan elk verzoek. Met denken aan deed `qwen3.5-9b`
-minuten over één zet en liep de A2A-aanroep in een time-out; zonder denken
-komt de zet binnen een paar seconden. Het speelt daardoor wel zwakker. Wil je
-het denken aan laten, start dan met `LMSTUDIO_REASONING= ./start.sh`. In de
-YAML instellen kan alleen in nieuwere versies
+**Welk lokaal model als speler?** Getest op vier stellingen met één duidelijk
+beste zet (drie keer blokkeren, één keer winnen), op een RTX 2060 SUPER (8 GB):
+
+| Model | Denken uit | Denken aan |
+|---|---|---|
+| `google/gemma-4-e4b` (Q4_K_M) | 1 van 4 goed, 1 à 2 s per zet | 4 van 4 goed, 17 tot 42 s per zet |
+| `qwen3.6-35b-a3b` (Q5_K_M) | 0 van 4 goed, deels onleesbaar | na 5000 tokens (5 minuten) nog geen zet |
+| `qwen3.5-9b` (Q3_K_S) | geldige maar zwakke zetten, 1 à 2 s | na 2500 tokens nog geen zet |
+
+Daarom staat `gemma-4-e4b` in de YAML, met denken aan. Voor een model dat te
+lang nadenkt kan het doorgeefluik het denken uitzetten: zet
+`LMSTUDIO_REASONING=none` in `.env`. Het voegt dan `reasoning_effort: none`
+toe aan elk verzoek. In de YAML instellen kan alleen in nieuwere versies
 (`provider_opts.extra_body.reasoning_effort`); v1.128.0 negeert dat.
 
 Geen lokaal model? Zet in `ttt.yaml` bij `player_o` weer `model: ornith` en

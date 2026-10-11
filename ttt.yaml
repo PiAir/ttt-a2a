@@ -1,7 +1,7 @@
 # Boter-kaas-eieren via A2A — docker agent demo
 #
 #   speler X  = CLUSTER.qwen3.8:latest      (A2A-server op :8080)
-#   speler O  = qwen3.5-9b via LM Studio   (A2A-server op :8081)
+#   speler O  = gemma-4-e4b via LM Studio  (A2A-server op :8081)
 #   root      = scheidsrechter (eigen proces; praat met beide spelers via A2A
 #               en voert zetten uit via ttt.py, de engine die de regels bewaakt)
 #
@@ -36,12 +36,13 @@ models:
   # `model: ornith` bij player_o.
   local:
     provider: lmstudio
-    model: qwen3.5-9b
+    model: google/gemma-4-e4b
     temperature: 0.7
-    # Het doorgeefluik lm_relay.py zet het denken uit (reasoning_effort:
-    # none); met denken aan doet dit model minuten over één zet.
+    # Dit model denkt 20 tot 45 seconden na per zet en speelt dan goed.
+    # Voor modellen die te lang nadenken kan het doorgeefluik het denken
+    # uitzetten: LMSTUDIO_REASONING=none in .env (zie README).
   # De scheidsrechter heeft betrouwbare tool calling over tientallen stappen
-  # nodig. Kleine lokale modellen (getest: qwen3.5-9b) verzinnen halverwege
+  # nodig. Kleine lokale modellen (getest: qwen3.5-9b) verzonnen halverwege
   # een uitslag; daarom draait hij op NOLAI, op het model dat niet meespeelt.
   referee_model:
     provider: nolai

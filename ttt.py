@@ -25,7 +25,7 @@ STATE = os.path.join(HERE, "state.json")
 # zet deze variabelen; de waarden hier gelden als je ttt.py los start.
 NAMES = {
     "X": os.environ.get("TTT_NAME_X", "qwen3.8"),
-    "O": os.environ.get("TTT_NAME_O", "qwen3.5-9b"),
+    "O": os.environ.get("TTT_NAME_O", "gemma-4-e4b"),
     "R": os.environ.get("TTT_NAME_REF", "qwen3.8"),  # scheidsrechter
 }
 MAX_ILLEGAL = 3  # na zoveel ongeldige pogingen op rij doet de engine een willekeurige zet

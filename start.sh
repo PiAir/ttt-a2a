@@ -22,6 +22,8 @@ CONFIG=${CONFIG:-ttt.yaml}          # CONFIG=ttt_v2.yaml ./start.sh  voor de var
 mkdir -p logs
 # Adres van de LM Studio-server (host:poort) voor het lokale model; leeg = geen lokaal model.
 LMSTUDIO_HOST=${LMSTUDIO_HOST:-$(sed -n 's/^LMSTUDIO_HOST=//p' .env | tr -d '\r"' | tail -1)}
+# Optioneel: denk-instelling die het doorgeefluik meestuurt (bv. none); leeg = model beslist zelf.
+export LMSTUDIO_REASONING=${LMSTUDIO_REASONING:-$(sed -n 's/^LMSTUDIO_REASONING=//p' .env | tr -d '\r"' | tail -1)}
 
 # Poorten moeten vrij zijn; anders praat de scheidsrechter met oude spelers
 # (bv. van een eerdere run met een andere docker agent-versie).
@@ -42,7 +44,7 @@ def model(key):
     m = re.search(rf"^  {key}:[ ]*\r?\n(?:(?:    .*)?\r?\n)*?    model: *(\S+)", text, re.M)
     return m.group(1) if m else ""
 name = model(model(sys.argv[2])) or model(sys.argv[2])
-print(re.sub(r"^CLUSTER\.|:latest$", "", name))
+print(re.sub(r"^CLUSTER\.|^.*/|:latest$", "", name))
 PY
 }
 export TTT_NAME_X=${TTT_NAME_X:-$(model_name player_x)}
